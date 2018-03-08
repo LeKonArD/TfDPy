@@ -16,8 +16,12 @@ import pandas as pd
 
 
 def collect_files_from_dir(corpus_folder, file_ending):
-
-    # create single-column pandas DataFrame containing Paths from dir with certain ending
+    """
+    Create single-column pandas DataFrame containing Paths from dir with certain ending
+    :param corpus_folder: path to folder containing files or dirs with files
+    :param file_ending: ending of files to collect in your corpus DataFrame
+    :return: DataFrame with column "file_path" to store Paths of corpus files
+    """
 
     files = list()
     for path, sub_dirs, file_names in os.walk(corpus_folder):
@@ -31,8 +35,11 @@ def collect_files_from_dir(corpus_folder, file_ending):
 
 
 def add_categories(corpus_df):
-
-    # map directories as descriptors for categories
+    """
+    Adds Categories for Classification task by using subdirs the corpus folder as label
+    :param corpus_df: DataFrame containing at least a column for "file_path"
+    :return: DataFrame containing new column "Categories" for classification based on subdirs
+    """
     categories = corpus_df.applymap(lambda x: x.split(os.sep)[-2])
     corpus_df["Categories"] = categories
 
@@ -40,14 +47,22 @@ def add_categories(corpus_df):
 
 
 def add_text(corpus_df):
-
+    """
+    Reads all paths in DataFrame["file_path"] and stores resulting string in DataFrame
+    :param corpus_df: DataFrame containing at least a column for "file_path"
+    :return: DataFrame with new column "text" with string
+    """
     corpus_df["text"] = corpus_df["file_path"].apply(lambda x: read_save(x))
 
     return corpus_df
 
 
 def read_save(f_path):
-
+    """
+    Reads file and closes it afterwards
+    :param f_path: a valid path as string
+    :return: text inside the file
+    """
     with open(f_path, "r") as file:
         text = file.read()
 
@@ -96,7 +111,7 @@ def initial_spacy_step(corpus_df, lang):
 
 # Tests
 
-corpus = collect_files_from_dir("/home/leo/Documents/schemaliteratur_DS/test_HA", "xml")
+corpus = collect_files_from_dir("./../testing/class_test", "txt")
 corpus = add_categories(corpus)
 corpus = add_text(corpus)
 corpus = initial_spacy_step(corpus, "de")
