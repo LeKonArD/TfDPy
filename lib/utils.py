@@ -11,9 +11,12 @@ Contents
 """
 # CORE File handling
 import os
+import numpy as np
 import spacy as sp
 import pandas as pd
+from itertools import islice, tee
 
+from keras.preprocessing.text import Tokenizer
 
 def collect_files_from_dir(corpus_folder, file_ending):
     """
@@ -71,32 +74,51 @@ def read_save(f_path):
 
 # preprocessing text
 def to_sentences(corpus_df):
+    """
+    Splits list of tokens into list of sentences containing tokens
+    :param corpus_df: DataFrame containing at least column "NLP"
+    :return: DataFrame with new column "sentences"
+    """
+    corpus_df["sentences"] = corpus_df["NLP"].apply(lambda x: [x for x in x.sents])
 
     return corpus_df
 
 
-def to_tokens(x):
+def to_chunks(corpus_df, scope, chunk_size):
+    """
+    Splits list of items into sublists of size n
+    :param corpus_df: DataFrame at least containing column with items to chunk
+    :param scope: name of column where items will be chunked
+    :param chunk_size: size of the chunks
+    :return:
+    """
+    corpus_df[scope+"_chunks"] = corpus_df[scope].apply(
+        lambda x: [x[i:i+chunk_size] for i in range(0, len(x), chunk_size)])
 
-    return x
-
-
-def to_chunks(x, chunk_size):
-
-    chunk_size += 1
-
-    return x
+    return corpus_df
 
 
 def to_chars(corpus_df):
-
-    corpus_df["text"] = corpus_df["text"].apply(lambda x: list(x))
+    """
+    Splitting strings to list of characters
+    :param corpus_df: DataFrame at least containing column "text" with strings inside
+    :return: DataFrame with new column "characters" containing list of characters
+    """
+    corpus_df["characters"] = corpus_df["text"].apply(lambda x: list(x))
 
     return corpus_df
 
 
-def to_ngrams(corpus_df, gram_size):
-
-    gram_size += 1
+def to_ngrams(corpus_df, scope, gram_size):
+    """
+    Generates ngrams from sentences, tokens or chars
+    :param corpus_df: corpus_df: DataFrame at least containing column with something to transform to ngrams
+    :param scope: column name of corpus_df containing items to transform
+    :param gram_size: size of the resulting ngrams
+    :return:
+    """
+    corpus_df[scope+"_ngrams"] = corpus_df[scope].apply(lambda x: list(
+        zip(*(islice(seq, index, None) for index, seq in enumerate(tee(x, gram_size))))))
 
     return corpus_df
 
@@ -109,10 +131,44 @@ def initial_spacy_step(corpus_df, lang):
     return corpus_df
 
 
+def generate_one_hot_matrix(corpus_df,scope,num_words):
+
+    samples = np.array(corpus_df[scope]).flatten("A")
+    samples = [str(item) for sublist in samples for item in sublist]
+    tokenizer = Tokenizer(num_words=num_words)
+    tokenizer.fit_on_texts(samples)
+
+    corpus_df["one_hot"] = corpus_df[scope].apply(lambda x: tokenizer.texts_to_matrix(
+        [str(item) for sublist in x for item in sublist], mode="binary"))
+
+    return corpus_df
+
+def generate_sequences(corpus_df,scope,num_words):
+
+    samples = np.array(corpus_df[scope]).flatten("A")
+    samples = [str(item) for sublist in samples for item in sublist]
+    tokenizer = Tokenizer(num_words=num_words)
+    tokenizer.fit_on_texts(samples)
+
+    corpus_df["sequneces"] = corpus_df[scope].apply(lambda x: tokenizer.texts_to_sequences(
+        [str(x) for x in x]))
+
+    return corpus_df
 # Tests
 
 corpus = collect_files_from_dir("./../testing/class_test", "txt")
 corpus = add_categories(corpus)
 corpus = add_text(corpus)
 corpus = initial_spacy_step(corpus, "de")
-print(corpus["NLP"].iloc[1])
+#corpus = to_ngrams(corpus, "NLP", 3)
+corpus = to_sentences(corpus)
+#corpus = to_chunks(corpus, "NLP", 4)
+
+
+
+
+corpus = generate_sequences(corpus, "sentences", 50)
+
+print(len(corpus["sentences"][0]))
+print(len([x for x in corpus["sequneces"][0]]))
+
