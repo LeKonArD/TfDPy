@@ -11,53 +11,14 @@ Contents
 """
 # CORE File handling
 import os
+import re
 import numpy as np
 import spacy as sp
 import pandas as pd
 from itertools import islice, tee
-
 from keras.preprocessing.text import Tokenizer
-
-def collect_files_from_dir(corpus_folder, file_ending):
-    """
-    Create single-column pandas DataFrame containing Paths from dir with certain ending
-    :param corpus_folder: path to folder containing files or dirs with files
-    :param file_ending: ending of files to collect in your corpus DataFrame
-    :return: DataFrame with column "file_path" to store Paths of corpus files
-    """
-
-    files = list()
-    for path, sub_dirs, file_names in os.walk(corpus_folder):
-        for filename in file_names:
-            if filename.endswith(file_ending):
-                files.append(os.path.join(path, filename))
-    files.sort()
-    corpus_df = pd.DataFrame(files, columns=['file_path'])
-
-    return corpus_df
-
-
-def add_categories(corpus_df):
-    """
-    Adds Categories for Classification task by using subdirs the corpus folder as label
-    :param corpus_df: DataFrame containing at least a column for "file_path"
-    :return: DataFrame containing new column "Categories" for classification based on subdirs
-    """
-    categories = corpus_df.applymap(lambda x: x.split(os.sep)[-2])
-    corpus_df["Categories"] = categories
-
-    return corpus_df
-
-
-def add_text(corpus_df):
-    """
-    Reads all paths in DataFrame["file_path"] and stores resulting string in DataFrame
-    :param corpus_df: DataFrame containing at least a column for "file_path"
-    :return: DataFrame with new column "text" with string
-    """
-    corpus_df["text"] = corpus_df["file_path"].apply(lambda x: read_save(x))
-
-    return corpus_df
+from keras.preprocessing.sequence import pad_sequences
+from sklearn.model_selection import train_test_split
 
 
 def read_save(f_path):
@@ -71,104 +32,201 @@ def read_save(f_path):
 
     return text
 
+class TrainingData(object):
 
-# preprocessing text
-def to_sentences(corpus_df):
-    """
-    Splits list of tokens into list of sentences containing tokens
-    :param corpus_df: DataFrame containing at least column "NLP"
-    :return: DataFrame with new column "sentences"
-    """
-    corpus_df["sentences"] = corpus_df["NLP"].apply(lambda x: [x for x in x.sents])
+    def __init__(self,folder):
+        """Return a Customer object whose name is *name* and starting
+        balance is *balance*."""
+        self.corpus_df = pd.DataFrame()
+        self.corpus_folder = folder
+        self.X = list()
+        self.Y = list()
+        self.x_train = None
+        self.x_test = None
+        self.y_train = None
+        self.y_test = None
 
-    return corpus_df
+    def collect_files_from_dir(self, file_ending):
+        """
+        Create single-column pandas DataFrame containing Paths from dir with certain ending
+        :param corpus_folder: path to folder containing files or dirs with files
+        :param file_ending: ending of files to collect in your corpus DataFrame
+        :return: DataFrame with column "file_path" to store Paths of corpus files
+        """
 
+        files = list()
+        for path, sub_dirs, file_names in os.walk(self.corpus_folder):
+            for filename in file_names:
+                if filename.endswith(file_ending):
+                    files.append(os.path.join(path, filename))
+        files.sort()
+        self.corpus_df = pd.DataFrame(files, columns=['file_path'])
 
-def to_chunks(corpus_df, scope, chunk_size):
-    """
-    Splits list of items into sublists of size n
-    :param corpus_df: DataFrame at least containing column with items to chunk
-    :param scope: name of column where items will be chunked
-    :param chunk_size: size of the chunks
-    :return:
-    """
-    corpus_df[scope+"_chunks"] = corpus_df[scope].apply(
-        lambda x: [x[i:i+chunk_size] for i in range(0, len(x), chunk_size)])
+        return self.corpus_df
 
-    return corpus_df
+    def add_categories(self):
+        """
+        Adds Categories for Classification task by using subdirs the corpus folder as label
+        :param corpus_df: DataFrame containing at least a column for "file_path"
+        :return: DataFrame containing new column "Categories" for classification based on subdirs
+        """
+        categories = self.corpus_df.applymap(lambda x: x.split(os.sep)[-2])
+        self.corpus_df["Categories"] = categories
 
-
-def to_chars(corpus_df):
-    """
-    Splitting strings to list of characters
-    :param corpus_df: DataFrame at least containing column "text" with strings inside
-    :return: DataFrame with new column "characters" containing list of characters
-    """
-    corpus_df["characters"] = corpus_df["text"].apply(lambda x: list(x))
-
-    return corpus_df
-
-
-def to_ngrams(corpus_df, scope, gram_size):
-    """
-    Generates ngrams from sentences, tokens or chars
-    :param corpus_df: corpus_df: DataFrame at least containing column with something to transform to ngrams
-    :param scope: column name of corpus_df containing items to transform
-    :param gram_size: size of the resulting ngrams
-    :return:
-    """
-    corpus_df[scope+"_ngrams"] = corpus_df[scope].apply(lambda x: list(
-        zip(*(islice(seq, index, None) for index, seq in enumerate(tee(x, gram_size))))))
-
-    return corpus_df
+        return self.corpus_df
 
 
-def initial_spacy_step(corpus_df, lang):
-
-    nlp = sp.load(lang)
-    corpus_df["NLP"] = corpus_df["text"].apply(lambda x: nlp(x))
-
-    return corpus_df
-
-
-def generate_one_hot_matrix(corpus_df,scope,num_words):
-
-    samples = np.array(corpus_df[scope]).flatten("A")
-    samples = [str(item) for sublist in samples for item in sublist]
-    tokenizer = Tokenizer(num_words=num_words)
-    tokenizer.fit_on_texts(samples)
-
-    corpus_df["one_hot"] = corpus_df[scope].apply(lambda x: tokenizer.texts_to_matrix(
-        [str(item) for sublist in x for item in sublist], mode="binary"))
-
-    return corpus_df
-
-def generate_sequences(corpus_df,scope,num_words):
-
-    samples = np.array(corpus_df[scope]).flatten("A")
-    samples = [str(item) for sublist in samples for item in sublist]
-    tokenizer = Tokenizer(num_words=num_words)
-    tokenizer.fit_on_texts(samples)
-
-    corpus_df["sequneces"] = corpus_df[scope].apply(lambda x: tokenizer.texts_to_sequences(
-        [str(x) for x in x]))
-
-    return corpus_df
-# Tests
-
-corpus = collect_files_from_dir("./../testing/class_test", "txt")
-corpus = add_categories(corpus)
-corpus = add_text(corpus)
-corpus = initial_spacy_step(corpus, "de")
-#corpus = to_ngrams(corpus, "NLP", 3)
-corpus = to_sentences(corpus)
-#corpus = to_chunks(corpus, "NLP", 4)
+    def add_text(self,lang):
+        """
+        Reads all paths in DataFrame["file_path"] and stores resulting string in DataFrame
+        :param corpus_df: DataFrame containing at least a column for "file_path"
+        :return: DataFrame with new column "text" with string
+        """
+        nlp = sp.load(lang)
+        self.corpus_df["text"] = self.corpus_df["file_path"].apply(lambda x: read_save(x))
+        self.corpus_df["NLP"] = self.corpus_df["text"].apply(lambda x: nlp(x))
+        return self.corpus_df
 
 
+    # preprocessing text
+    def to_sentences(self):
+        """
+        Splits list of tokens into list of sentences containing tokens
+        :param corpus_df: DataFrame containing at least column "NLP"
+        :return: DataFrame with new column "sentences"
+        """
+        self.corpus_df["sentences"] = self.corpus_df["NLP"].apply(lambda x: [x for x in x.sents])
+
+        return self.corpus_df
 
 
-corpus = generate_sequences(corpus, "sentences", 50)
+    def to_chunks(self, scope, chunk_size):
+        """
+        Splits list of items into sublists of size n
+        :param corpus_df: DataFrame at least containing column with items to chunk
+        :param scope: name of column where items will be chunked
+        :param chunk_size: size of the chunks
+        :return:
+        """
+        self.corpus_df[scope+"_chunks"] = self.corpus_df[scope].apply(
+            lambda x: [x[i:i+chunk_size] for i in range(0, len(x), chunk_size)])
 
-print(len(corpus["sentences"][0]))
-print(len([x for x in corpus["sequneces"][0]]))
+        return self.corpus_df
+
+
+    def to_chars(self):
+        """
+        Splitting strings to list of characters
+        :param corpus_df: DataFrame at least containing column "text" with strings inside
+        :return: DataFrame with new column "characters" containing list of characters
+        """
+        self.corpus_df["characters"] = self.corpus_df["text"].apply(lambda x: list(x))
+
+        return self.corpus_df
+
+
+    def to_ngrams(self, scope, gram_size):
+        """
+        Generates ngrams from sentences, tokens or chars
+        :param corpus_df: corpus_df: DataFrame at least containing column with something to transform to ngrams
+        :param scope: column name of corpus_df containing items to transform
+        :param gram_size: size of the resulting ngrams
+        :return:
+        """
+        self.corpus_df[scope+"_ngrams"] = self.corpus_df[scope].apply(lambda x: list(
+            zip(*(islice(seq, index, None) for index, seq in enumerate(tee(x, gram_size))))))
+
+        return self.corpus_df
+
+
+    def generate_one_hot_matrix(self, scope, num_words):
+        """
+
+        :param corpus_df:
+        :param scope:
+        :param num_words:
+        :return:
+        """
+        samples = np.array(self.corpus_df[scope]).flatten("A")
+        samples = [str(item) for sublist in samples for item in sublist]
+        tokenizer = Tokenizer(num_words=num_words)
+        tokenizer.fit_on_texts(samples)
+
+        self.corpus_df["one_hot"] = self.corpus_df[scope].apply(lambda x: tokenizer.texts_to_matrix(
+            [str(item) for sublist in x for item in sublist], mode="binary"))
+
+        return self.corpus_df
+
+
+    def generate_sequences(self, scope, num_words):
+        """
+
+        :param corpus_df:
+        :param scope:
+        :param num_words:
+        :return:
+        """
+        samples = np.array(self.corpus_df[scope]).flatten("A")
+        samples = [str(item) for sublist in samples for item in sublist]
+        tokenizer = Tokenizer(num_words=num_words)
+        tokenizer.fit_on_texts(samples)
+
+        self.corpus_df["sequences"] = self.corpus_df[scope].apply(lambda x: tokenizer.texts_to_sequences(
+            [str(x) for x in x]))
+
+        return self.corpus_df
+
+
+    def padding_sequences(self, maxlen):
+        """
+
+        :param corpus_df:
+        :param maxlen:
+        :return:
+        """
+        self.corpus_df["sequences"] = self.corpus_df["sequences"].apply(lambda x: pad_sequences(x, maxlen))
+
+        return self.corpus_df
+
+
+    def to_categorial_trainingdata(self, scope):
+        """
+
+        :param corpus_df:
+        :param scope:
+        :return:
+        """
+        categories = np.unique(self.corpus_df["Categories"])
+        i = 0
+        for category in categories:
+            self.corpus_df["Categories"] = self.corpus_df["Categories"].apply(
+                lambda x: re.sub("^"+re.escape(category)+"$", str(i), x))
+            i += 1
+
+
+        for index, row in self.corpus_df.iterrows():
+
+            self.X.append(row[scope])
+            self.Y.append([int(row["Categories"])] * len(row[scope]))
+
+        self.X = [x for sublist in self.X for x in sublist]
+        self.Y = [y for sublist in self.Y for y in sublist]
+        self.X = np.array(self.X)
+        self.Y = np.array(self.Y).flatten()
+
+        return self.X, self.Y
+
+
+    def split_training_data(self, ratio):
+        """
+
+        :param X:
+        :param Y:
+        :param ratio:
+        :return:
+        """
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.X, self.Y, test_size=ratio)
+
+        return self.x_train, self.x_test, self.y_train, self.y_test
+
 
