@@ -227,6 +227,18 @@ class TrainingData(object):
 
         self.corpus_df["sequence_training"] = self.corpus_df["text"].apply(lambda x: context_grabber(x, windowsize))
 
+    def to_sequential_trainingdata(self):
+
+        self.X = list(self.corpus_df["sequences"])
+        self.X = [x for sublist in self.X for x in sublist]
+        self.X = np.array(self.X)
+
+        self.Y = list(self.corpus_df["sequence_label"])
+        self.Y = [x for sublist in self.Y for x in sublist]
+        self.Y = np.array(self.Y)
+
+        return self.X, self.Y
+
 
 def context_grabber(sequence, windowsize):
 

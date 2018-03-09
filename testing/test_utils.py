@@ -20,8 +20,19 @@ print(clf.score(mydata.x_test, mydata.y_test))
 """
 
 mydata = utils.TrainingData("./../testing/sequence_test")
-
+print("start")
 mydata.collect_files_from_dir("tsv")
 mydata.load_sequential_data()
-mydata.add_sequential_context(3)
+mydata.add_sequential_context(2)
+mydata.generate_sequences("sequence_training", 10000)
+mydata.padding_sequences(4)
 print(mydata.corpus_df["sequence_training"][0])
+
+
+
+X, Y = mydata.to_sequential_trainingdata()
+print(X)
+print(len(X))
+print(len(Y))
+
+
