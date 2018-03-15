@@ -30,7 +30,7 @@ print(mydata.corpus_df["sequence_training"][0])
 
 
 
-X, Y = mydata.to_sequential_trainingdata()
+X, Y = mydata.to_sequential_trainingdata
 print(X)
 print(len(X))
 print(len(Y))
