@@ -34,7 +34,8 @@ def read_save(f_path):
 
 class TrainingData(object):
 
-    def __init__(self, scope, num_words, file_ending, folder, windowsize, ratio, maxlen):
+    def __init__(self, scope, num_words, file_ending, folder, windowsize,
+                 ratio, maxlen, chunk_size, gram_size, lang):
         self.corpus_df = pd.DataFrame()
         self.scope = scope
         self.num_words = num_words
@@ -43,9 +44,9 @@ class TrainingData(object):
         self.windowsize = windowsize
         self.ratio = ratio
         self.maxlen = maxlen
-        #self.lang = lang
-        #self.chunk_size = chunk_size
-        #self.ngrams = ngrams
+        self.lang = lang
+        self.chunk_size = chunk_size
+        self.gram_size = gram_size
         self.X = None
         self.Y = None
         self.x_train = None
@@ -107,7 +108,7 @@ class TrainingData(object):
 
     def generate_one_hot_matrix(self):
 
-        samples = np.array(self.corpus_df[scope]).flatten("A")
+        samples = np.array(self.corpus_df[self.scope]).flatten("A")
         samples = [str(item) for sublist in samples for item in sublist]
         tokenizer = Tokenizer(num_words=self.num_words)
         tokenizer.fit_on_texts(samples)
@@ -211,7 +212,70 @@ def context_grabber(sequence, windowsize):
     return single_sequences
 
 
-def TD_paramsearch(pipeline, parameters, classifier):
+def fill_parameters(parameter_raw):
+
+    all_parameters = ["scope", "num_words", "file_ending", "folder",
+                      "windowsize", "ratio", "maxlen", "gram_size", "chunk_size", "lang"]
+
+    for param in all_parameters:
+        if param not in parameter_raw.keys():
+
+            parameter_raw.update({param: [None]})
+
+    return parameter_raw
+
+
+def single_run_paramsearch(pipeline, classifier, scope_single, num_words_single, file_ending_single, folder_single,
+                           windowsize_single, ratio_single, maxlen_single, gram_size_single, chunk_size_single,
+                           lang_single):
+
+    this_td = TrainingData(scope=scope_single,
+                           num_words=num_words_single,
+                           file_ending=file_ending_single,
+                           folder=folder_single,
+                           windowsize=windowsize_single,
+                           ratio=ratio_single,
+                           maxlen=maxlen_single,
+                           gram_size=gram_size_single,
+                           chunk_size=chunk_size_single,
+                           lang=lang_single)
+
+    for function_call in pipeline:
+
+        if function_call.__name__ == "to_sequential_trainingdata":
+            this_td.X, this_td.Y = getattr(this_td, function_call.__name__)()
+            continue
+
+        if function_call.__name__ == "split_training_data":
+            this_td.x_train, this_td.x_test, this_td.y_train, this_td.y_test = getattr(this_td,
+                                                                                       function_call.__name__)()
+            continue
+
+        this_td.corpus_df = getattr(this_td, function_call.__name__)()
+
+    clf = classifier[0]()
+    clf.fit(this_td.x_train, this_td.y_train)
+    score = clf.score(this_td.x_test, this_td.y_test)
+    result = {"folder": folder_single,
+              "file_ending": file_ending_single,
+              "scope": scope_single,
+              "num_words": num_words_single,
+              "windowsize": windowsize_single,
+              "maxlen": maxlen_single,
+              "ratio": ratio_single,
+              "score": score,
+              "lang": lang_single,
+              "gram_size": gram_size_single,
+              "chunk_size": chunk_size_single}
+
+    return result
+
+
+def td_paramsearch(pipeline, parameters, classifier):
+
+    results = list()
+
+    parameters = fill_parameters(parameters)
 
     for scope_single in parameters["scope"]:
         for num_words_single in parameters["num_words"]:
@@ -220,28 +284,19 @@ def TD_paramsearch(pipeline, parameters, classifier):
                     for windowsize_single in parameters["windowsize"]:
                         for ratio_single in parameters["ratio"]:
                             for maxlen_single in parameters["maxlen"]:
-                                this_trainingdata = TrainingData(scope=scope_single,
-                                                                 num_words=num_words_single,
-                                                                 file_ending=file_ending_single,
-                                                                 folder=folder_single,
-                                                                 windowsize=windowsize_single,
-                                                                 ratio=ratio_single,
-                                                                 maxlen=maxlen_single)
+                                for gram_size_single in parameters["gram_size"]:
+                                    for chunk_size_single in parameters["chunk_size"]:
+                                        for lang_single in parameters["lang"]:
+                                            result = single_run_paramsearch(pipeline, classifier, scope_single,
+                                                                            num_words_single,
+                                                                            file_ending_single,
+                                                                            folder_single,
+                                                                            windowsize_single,
+                                                                            ratio_single, maxlen_single,
+                                                                            gram_size_single,
+                                                                            chunk_size_single, lang_single)
 
-                                for function_call in pipeline:
+                                            results.append(result)
 
-                                    if function_call.__name__ == "to_sequential_trainingdata":
-                                        this_trainingdata.X, this_trainingdata.Y = getattr(this_trainingdata,
-                                                                                           function_call.__name__)()
-                                        continue
-
-                                    if function_call.__name__ == "split_training_data":
-                                        this_trainingdata.x_train, this_trainingdata.x_test, this_trainingdata.y_train, this_trainingdata.y_test = getattr(this_trainingdata,
-                                                                                                                                                           function_call.__name__)()
-                                        continue
-
-                                    this_trainingdata.corpus_df = getattr(this_trainingdata, function_call.__name__)()
-
-
-
-    return this_trainingdata
+    scores = pd.DataFrame(results).sort_values(by=["score"], ascending=False)
+    return scores

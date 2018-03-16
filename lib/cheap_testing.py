@@ -16,21 +16,19 @@ pipeline = [utils.TrainingData.collect_files_from_dir,
 
 parameters = {"scope": ["sequence_training"],
             "file_ending": ["tsv"],
-            "num_words": [10],
-            "windowsize": [3],
+            "num_words": [100],
+            "windowsize": [3,4,5],
             "ratio": [0.1],
             "folder": ["/media/konle/3d665f71-096f-4974-8ef9-b365f5f16389/software/TfDPy/testing/sequence_test"],
-            "maxlen": [3]}
+            "maxlen": [3,4,5]}
 
 classifier = [svm.SVC]
 
-values = utils.TD_paramsearch(pipeline, parameters, classifier)
+values = utils.td_paramsearch(pipeline, parameters, classifier)
 
-print(values.corpus_df)
-print(values.x_test)
+print(values)
 
 
-"""
 
 scope = ["sequence_training"]
 file_ending = ["tsv"]
@@ -61,6 +59,6 @@ for scope_g in scope:
                         #clf = svm.SVC()
                         #clf.fit(mydata.x_train, mydata.y_train)
                         #print(clf.score(mydata.x_test, mydata.y_test))
-"""
+
 
 
