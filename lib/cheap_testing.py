@@ -15,11 +15,11 @@ pipeline = [utils.TrainingData.collect_files_from_dir,
 
 
 parameters = {"scope": ["sequence_training"],
-            "file_ending": ["tsv"],
-            "num_words": [100],
+            "file_ending": ["txt"],
+            "num_words": [10],
             "windowsize": [3,4,5],
             "ratio": [0.1],
-            "folder": ["/media/konle/3d665f71-096f-4974-8ef9-b365f5f16389/software/TfDPy/testing/sequence_test"],
+            "folder": ["/media/konle/3d665f71-096f-4974-8ef9-b365f5f16389/software/TfDPy/testing/chinese_training"],
             "maxlen": [3,4,5]}
 
 classifier = [svm.SVC]

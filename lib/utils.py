@@ -241,7 +241,7 @@ def single_run_paramsearch(pipeline, classifier, scope_single, num_words_single,
                            lang=lang_single)
 
     for function_call in pipeline:
-
+        print(function_call.__name__)
         if function_call.__name__ == "to_sequential_trainingdata":
             this_td.X, this_td.Y = getattr(this_td, function_call.__name__)()
             continue
@@ -256,6 +256,9 @@ def single_run_paramsearch(pipeline, classifier, scope_single, num_words_single,
     clf = classifier[0]()
     clf.fit(this_td.x_train, this_td.y_train)
     score = clf.score(this_td.x_test, this_td.y_test)
+
+    print(score)
+
     result = {"folder": folder_single,
               "file_ending": file_ending_single,
               "scope": scope_single,
