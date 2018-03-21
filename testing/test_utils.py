@@ -4,8 +4,9 @@
 from unittest.mock import patch, mock_open
 from lib import utils
 import unittest
+import numpy as np
 import pandas as pd
-
+import collections
 
 class UtilsTestCase(unittest.TestCase):
     def setUp(self):
@@ -79,4 +80,99 @@ class UtilsTestCase(unittest.TestCase):
         output = utils.TrainingData.add_categories(mock_obj)
         self.assertTrue(list(output["Categories"] == ["a", "b", "b", "c"]))
 
+    @unittest.mock.patch("lib.utils.read_save")
+    def test_add_text(self, mock_read_save):
+
+        mock_read_save.return_value = "Das ist ein Test"
+        mock_read_save.nlp = ("Das", "ist", "ein", "Test")
+        mock_obj = unittest.mock.Mock()
+        mock_obj.lang = "de"
+        mock_obj.corpus_df = pd.DataFrame({"file_path": ["foo/a/Training.test",
+                                                         "foo/b/Training.test"]})
+
+        output = utils.TrainingData.add_text(mock_obj)
+        self.assertTrue(list(output["text"]) == ["Das ist ein Test", "Das ist ein Test"])
+
+    def test_to_sentences(self):
+
+        mock_obj = unittest.mock.Mock()
+        a = collections.namedtuple("doc","sents")
+        b = a(sents=[["Das", "ist", "ein", "Test", "."], ["Das", "auch", "."]])
+
+
+        mock_obj.corpus_df = pd.DataFrame({"tokens": [b]})
+
+        output = utils.TrainingData.to_sentences(mock_obj)
+        self.assertTrue(list(output["sentences"]) == [[["Das", "ist", "ein", "Test", "."], ["Das", "auch", "."]]])
+
+    def test_to_chunks(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.scope = "test"
+        mock_obj.chunk_size = 2
+        mock_obj.corpus_df = pd.DataFrame({"test": [[None] * 6]})
+
+        output = utils.TrainingData.to_chunks(mock_obj)
+        self.assertTrue(list(output["test_chunks"]) == [[[None, None], [None, None], [None, None]]])
+
+    def test_to_chars(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.corpus_df = pd.DataFrame({"text": ["test", "tset"]})
+        output = utils.TrainingData.to_chars(mock_obj)
+        self.assertTrue(list(output["characters"]) == [["t", "e", "s", "t"], ["t", "s", "e", "t"]])
+
+    def test_to_ngrams(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.scope = "test"
+        mock_obj.gram_size = 3
+        mock_obj.corpus_df = pd.DataFrame({"test": [["t", "e", "s", "t"], ["t", "s", "e", "t"]]})
+        output = utils.TrainingData.to_ngrams(mock_obj)
+        self.assertTrue(list(output["test_ngrams"]) == [[("t", "e", "s"), ("e", "s", "t")],
+                                                        [("t", "s", "e"), ("s", "e", "t")]])
+
+    def test_generate_one_hot_matrix(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.scope = "test"
+        mock_obj.num_words = 3
+        mock_obj.corpus_df = pd.DataFrame({"test": ["Ein Test"]})
+
+        output = utils.TrainingData.generate_one_hot_matrix(mock_obj)
+        self.assertTrue(list(output["one_hot"][0].flatten()) == [0., 1., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                                                 0., 0., 0., 0., 1., 0., 1., 0., 0., 0.,
+                                                                 0., 0., 0., 1.])
+
+    def test_generate_sequences(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.scope = "test"
+        mock_obj.num_words = 5
+        mock_obj.corpus_df = pd.DataFrame({"test": ["Ein Test"]})
+
+        output = utils.TrainingData.generate_sequences(mock_obj)
+        self.assertTrue(list(output["sequences"]) == [[[1], [3], [4], [], [2], [1], [], [2]]])
+
+    def test_padding_sequences(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.maxlen = 8
+        mock_obj.corpus_df = pd.DataFrame({"sequences": [[[1, 3, 4, 4, 1, 2],
+                                                         [1, 3, 4, 2, 1, 2]]]})
+
+        output = utils.TrainingData.padding_sequences(mock_obj)
+        self.assertTrue(list(output["sequences"][0].flatten()) == [0, 0, 1, 3, 4, 4, 1, 2, 0, 0, 1, 3, 4, 2, 1, 2])
+
+    def test_to_categorical_trainingdata(self):
+
+        mock_obj = unittest.mock.Mock()
+        mock_obj.scope = "test"
+        mock_obj.corpus_df = pd.DataFrame({"test": [[1, 1, 4], [2, 4, 3], [3, 4, 5], [4, 6, 7]],
+                                           "Categories": ["a", "b", "a", "b"]})
+
+        x, y = utils.TrainingData.to_categorical_trainingdata(mock_obj)
+
+        self.assertTrue(list(x) == [1, 1, 4, 2, 4, 3, 3, 4, 5, 4, 6, 7] and
+                        list(y) == [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1])
 
