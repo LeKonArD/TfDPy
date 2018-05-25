@@ -35,7 +35,9 @@ def read_save(f_path):
 class TrainingData(object):
 
     def __init__(self, num_words=None, file_ending=None, folder=None, windowsize=None,
-                 ratio=None, maxlen=None, chunk_size=None, gram_size=None, lang=None, chunk_scope=None, sequence_scope=None, categorical_scope=None):
+                 ratio=None, maxlen=None, chunk_size=None, gram_size=None, lang=None, chunk_scope=None,
+                 sequence_scope=None, categorical_scope=None, nlp_scope=None):
+
         self.corpus_df = pd.DataFrame()
         self.num_words = num_words
         self.file_ending = file_ending
@@ -49,12 +51,19 @@ class TrainingData(object):
         self.chunk_scope = chunk_scope
         self.gram_size = gram_size
         self.categorical_scope = categorical_scope
+        self.nlp_scope = nlp_scope
         self.X = None
         self.Y = None
         self.x_train = None
         self.x_test = None
         self.y_train = None
         self.y_test = None
+
+
+    def read_single_tsv(self):
+
+        self.corpus_df = pd.read_csv(self.corpus_df["file_path"][0], sep="\t")
+        return self.corpus_df
 
     def collect_files_from_dir(self):
 
@@ -75,7 +84,14 @@ class TrainingData(object):
     def nlp_text(self):
 
         nlp = sp.load(self.lang)
-        self.corpus_df["sequence_training"] = self.corpus_df["sequence_training"].apply(lambda x: [nlp(x) for x in x])
+
+
+        self.corpus_df["sequence_training"] = self.corpus_df[self.nlp_scope].apply(lambda x: nlp(x))
+
+        if len(np.shape(np.array(self.corpus_df["sequence_training"]))) == 1:
+            self.corpus_df["sequence_training"] = self.corpus_df["sequence_training"].apply(lambda x: [x])
+
+
         return self.corpus_df
 
     def add_categories(self):
@@ -143,13 +159,15 @@ class TrainingData(object):
         self.corpus_df["sequences"] = self.corpus_df[self.sequence_scope].apply(lambda x: tokenizer.texts_to_sequences(
             [item.text for item in x]))
 
-        #self.corpus_df["sequences"] = self.corpus_df["sequences"].apply(lambda x: [[item for sublist in x for item in sublist]])
 
         return self.corpus_df
 
     def padding_sequences(self):
 
-        self.corpus_df["sequences"] = self.corpus_df["sequences"].apply(lambda x: pad_sequences(x, self.maxlen, padding='post'))
+        self.corpus_df["sequences"] = self.corpus_df["sequences"].apply(lambda x: pad_sequences(x, self.maxlen,
+                                                                                                padding='post',
+                                                                                                dtype='float64',
+                                                                                                truncating="post"))
         return self.corpus_df
 
     def to_categorical_trainingdata(self):
@@ -180,22 +198,17 @@ class TrainingData(object):
 
         self.X = list()
         self.Y = list()
-        self.labels = ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15",
-                       "16","17","18","19","20","21","22","23","24"]
 
         for index, row in self.corpus_df.iterrows():
 
-            self.X.append(row["sequences"].flatten())
+            self.X.append(np.array(row["sequences"], dtype=float).flatten())
             row_labels = list()
             for label_name in self.labels:
 
-                row_labels.append(float(row[label_name]))
+                row_labels.append(int(row[label_name]))
 
             self.Y.append(row_labels)
 
-
-        self.X = np.asarray(self.X)
-        self.Y = np.array(self.Y)
         return self.X, self.Y
 
     def split_training_data(self):
