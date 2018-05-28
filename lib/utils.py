@@ -34,9 +34,9 @@ def read_save(f_path):
 
 class TrainingData(object):
 
-    def __init__(self, num_words=None, file_ending=None, folder=None, windowsize=None,
+    def __init__(self, num_words=None, file_ending=None, folder=None, windowsize=None, one_hot_scope=None,
                  ratio=None, maxlen=None, chunk_size=None, gram_size=None, lang=None, chunk_scope=None,
-                 sequence_scope=None, categorical_scope=None, nlp_scope=None):
+                 sequence_scope=None, categorical_scope=None, nlp_scope=None, labels=None, ngram_scope=None):
 
         self.corpus_df = pd.DataFrame()
         self.num_words = num_words
@@ -52,13 +52,15 @@ class TrainingData(object):
         self.gram_size = gram_size
         self.categorical_scope = categorical_scope
         self.nlp_scope = nlp_scope
+        self.labels = labels
+        self.ngram_scope = ngram_scope
+        self.one_hot_scope = one_hot_scope
         self.X = None
         self.Y = None
         self.x_train = None
         self.x_test = None
         self.y_train = None
         self.y_test = None
-
 
     def read_single_tsv(self):
 
@@ -84,13 +86,10 @@ class TrainingData(object):
     def nlp_text(self):
 
         nlp = sp.load(self.lang)
-
-
         self.corpus_df["sequence_training"] = self.corpus_df[self.nlp_scope].apply(lambda x: nlp(x))
 
         if len(np.shape(np.array(self.corpus_df["sequence_training"]))) == 1:
             self.corpus_df["sequence_training"] = self.corpus_df["sequence_training"].apply(lambda x: [x])
-
 
         return self.corpus_df
 
@@ -130,19 +129,19 @@ class TrainingData(object):
 
     def to_ngrams(self):
 
-        self.corpus_df[self.scope+"_ngrams"] = self.corpus_df[self.scope].apply(lambda x: list(
+        self.corpus_df[self.ngram_scope+"_ngrams"] = self.corpus_df[self.ngram_scope].apply(lambda x: list(
             zip(*(islice(seq, index, None) for index, seq in enumerate(tee(x, self.gram_size))))))
 
         return self.corpus_df
 
     def generate_one_hot_matrix(self):
 
-        samples = np.array(self.corpus_df[self.scope]).flatten("A")
+        samples = np.array(self.corpus_df[self.one_hot_scope]).flatten("A")
         samples = [str(item) for sublist in samples for item in sublist]
         tokenizer = Tokenizer(num_words=self.num_words)
         tokenizer.fit_on_texts(samples)
 
-        self.corpus_df["one_hot"] = self.corpus_df[self.scope].apply(lambda x: tokenizer.texts_to_matrix(
+        self.corpus_df["one_hot"] = self.corpus_df[self.one_hot_scope].apply(lambda x: tokenizer.texts_to_matrix(
             [str(item) for sublist in x for item in sublist], mode="binary"))
 
         return self.corpus_df
@@ -152,13 +151,11 @@ class TrainingData(object):
         samples = self.corpus_df[self.sequence_scope]
 
         samples = [item.text for subitem in samples for item in subitem]
-        print(samples)
         tokenizer = Tokenizer(num_words=self.num_words)
         tokenizer.fit_on_texts(samples)
 
         self.corpus_df["sequences"] = self.corpus_df[self.sequence_scope].apply(lambda x: tokenizer.texts_to_sequences(
             [item.text for item in x]))
-
 
         return self.corpus_df
 
@@ -278,9 +275,9 @@ def fill_parameters(parameter_raw):
     return parameter_raw
 
 
-def single_run_paramsearch(pipeline, classifier, sequence_scope_single, num_words_single, file_ending_single, folder_single,
-                           windowsize_single, ratio_single, maxlen_single, gram_size_single, chunk_size_single,
-                           lang_single, chunk_scope_single, categorical_scope_single):
+def single_run_paramsearch(pipeline, classifier, sequence_scope_single, num_words_single, file_ending_single,
+                           folder_single, windowsize_single, ratio_single, maxlen_single, gram_size_single,
+                           chunk_size_single, lang_single, chunk_scope_single, categorical_scope_single):
 
     this_td = TrainingData(sequence_scope=sequence_scope_single,
                            num_words=num_words_single,
