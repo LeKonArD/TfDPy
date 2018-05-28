@@ -1,58 +1,52 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from lib import utils
+from lib import utils as TfDPy
 from sklearn.neighbors import KNeighborsClassifier
 from keras import Sequential
 from keras.layers import Dense,Flatten,Embedding
 
 
-myData = utils.TrainingData()
+pipeline = [TfDPy.TrainingData.collect_files_from_dir,
+            TfDPy.TrainingData.read_single_tsv,
+            TfDPy.TrainingData.nlp_text,
+            TfDPy.TrainingData.generate_sequences,
+            TfDPy.TrainingData.padding_sequences,
+            TfDPy.TrainingData.to_multilabel_trainingdata,
+            TfDPy.TrainingData.split_training_data]
 
-
-# get filepaths
-
-myData.folder = "/home/konle/Documents/data_jose/casa-citas-private/data/"
-myData.file_ending = "csv"
-myData.corpus_df = myData.collect_files_from_dir()
-
-# read tsv
-myData.corpus_df = myData.read_single_tsv()
-
-# nlp text
-myData.lang = "es"
-myData.nlp_scope = "text"
-myData.corpus_df = myData.nlp_text()
-
-
-# generate sequences
-
-myData.sequence_scope = "sequence_training"
-myData.num_words = 1000
-myData.corpus_df = myData.generate_sequences()
-
-# padding
-
-myData.maxlen = 3
-myData.corpus_df = myData.padding_sequences()
-
-# to multilabel training data
-
-myData.labels = ["1","2"]
-myData.X, myData.Y = myData.to_multilabel_trainingdata()
-
-myData.ratio = 0.1
-myData.x_train, myData.x_test, myData.y_train, myData.y_test = myData.split_training_data()
+parameters = {"folder": ["/home/konle/Documents/data_jose/casa-citas-private/data/"],
+             "file_ending": ["csv"],
+             "lang": ["es"],
+             "nlp_scope": ["text"],
+             "sequence_scope": ["sequence_training"],
+             "num_words": [100],
+             "maxlen": [3],
+             "labels": [[1], [2], [3]],
+             "ratio": [0.1],
+             "categorical_scope": ["sequences"]}
 
 clf = KNeighborsClassifier()
-clf.fit(myData.x_train, myData.y_train)
-print(clf.score(myData.x_test, myData.y_test))
 
 model = Sequential()
-model.add(Embedding(300, myData.maxlen, input_length=3))
+model.add(Embedding(300, 3, input_length=3))
 model.add(Flatten())
-model.add(Dense(len(myData.labels), activation='sigmoid'))
+model.add(Dense(units=1, activation='sigmoid'))
 model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['acc'])
 
-model.fit(myData.x_train, myData.y_train)
-model.predict(myData.x_test)
+classifier = [clf, model]
+
+values = TfDPy.td_paramsearch(pipeline, parameters, classifier)
+
+model2 = Sequential()
+model2.add(Embedding(300, 3, input_length=3))
+model2.add(Flatten())
+model2.add(Dense(units=3, activation='sigmoid'))
+model2.compile(optimizer="adam", loss='binary_crossentropy', metrics=['acc'])
+
+parameters["labels"] = [[1, 2, 3]]
+classifier = [clf, model2]
+
+values2 = TfDPy.td_paramsearch(pipeline, parameters, classifier)
+print(values)
+print(values2)

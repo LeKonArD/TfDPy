@@ -30,12 +30,12 @@ myData.chunk_size = 1000
 myData.corpus_df = utils.TrainingData.to_chunks(myData)
 
 # Indexing
-myData.num_words = 1000
+myData.num_words = 100
 myData.sequence_scope = "tokens"
 myData.corpus_df = utils.TrainingData.generate_sequences(myData)
 
 # Padding
-myData.maxlen = 4000
+myData.maxlen = 1000
 myData.corpus_df = utils.TrainingData.padding_sequences(myData)
 
 # To Training Data
@@ -43,7 +43,7 @@ myData.categorical_scope = "sequences"
 myData.X, myData.Y = utils.TrainingData.to_categorical_trainingdata(myData)
 
 # Train Test Split
-myData.ratio = 0.5
+myData.ratio = 0.1
 myData.x_train, myData.x_test, myData.y_train, myData.y_test = utils.TrainingData.split_training_data(myData)
 
 clf = SVC()

@@ -23,11 +23,12 @@ myData.corpus_df = myData.load_sequential_data()
 # add some context
 myData.windowsize = 3
 myData.corpus_df = myData.add_sequential_context()
-
+print(myData.corpus_df)
 
 # tokenize text
 
 myData.lang = "de"
+myData.nlp_scope = "sequence_training"
 myData.corpus_df = myData.nlp_text()
 
 # indexing
